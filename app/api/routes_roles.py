@@ -7,11 +7,10 @@ from core.dependencies import require_role
 
 router = APIRouter(prefix="/roles", tags=["roles"])
 
-@router.get("/", response_model=list[RoleOut])
-def list_roles(db: Session = Depends(get_db)):
+@router.get("/", response_model=list[RoleOut], dependencies=[Depends(require_role("admin"))])
+def get_roles_route(db: Session = Depends(get_db)):
     return get_roles(db)
 
-
 @router.post("/", response_model=RoleOut, dependencies=[Depends(require_role("admin"))])
-def new_role(role: RoleCreate, db: Session = Depends(get_db)):
+def create_role_route(role: RoleCreate, db: Session = Depends(get_db)):
     return create_role(db, role)

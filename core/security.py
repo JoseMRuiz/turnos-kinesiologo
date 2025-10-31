@@ -2,8 +2,11 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
-from fastapi.security import OAuth2PasswordBearer
+from fastapi.security import APIKeyHeader
 from core.config import settings
+from db.session import get_db
+from db.user import User
+from sqlalchemy.orm import Session
 
 # Configuración de hash
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -42,7 +45,7 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
 
 
 
-oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
+oauth2_scheme = APIKeyHeader(name="Authorization")
 
 def verify_token(token: str = Depends(oauth2_scheme)):
 
@@ -55,3 +58,17 @@ def verify_token(token: str = Depends(oauth2_scheme)):
             detail="Token inválido o expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
+
+def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
+    try:
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        username: str = payload.get("sub")
+        if username is None:
+            raise HTTPException(status_code=401, detail="Token inválido")
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Token inválido o expirado")
+
+    user = db.query(User).filter(User.username == username).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    return user
