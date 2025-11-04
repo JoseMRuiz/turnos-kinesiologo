@@ -9,13 +9,22 @@ class User(Base):
     nombre: Mapped[str] = mapped_column(String(120), nullable=False)
     email: Mapped[str] = mapped_column(String(190), unique=True, index=True, nullable=False)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
-        # 🔹 Eliminamos el campo 'rol' de texto y agregamos la ForeignKey
-    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id"), nullable=False)
+    role_id: Mapped[int | None] = mapped_column(Integer, ForeignKey("roles.id"), nullable=True)
 
-    # 🔹 Relación con el modelo Role
+    # Relación con Role
     role = relationship("Role", back_populates="users")
 
-    # 🔹 Relación con Turno (ya la tenías)
-    turnos = relationship("Turno", back_populates="user")
+    # 👇 Relaciones separadas para evitar ambigüedad
+    turnos_como_paciente = relationship(
+        "Turno",
+        back_populates="paciente",
+        foreign_keys="Turno.paciente_id",
+        cascade="all, delete-orphan"
+    )
 
-    turnos = relationship("Turno", back_populates="user")
+    turnos_como_kinesiologo = relationship(
+        "Turno",
+        back_populates="kinesiologo",
+        foreign_keys="Turno.kinesiologo_id",
+        cascade="all, delete-orphan"
+    )

@@ -40,11 +40,11 @@ def login_user(db: Session, email: str, password: str):
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
 
-    
+ 
     token_data = {
         "sub": user.email,
         "role": user.role.name if user.role else None,
-        "username": user.nombre
+        "id": user.id,
     }
 
     access_token = create_access_token(

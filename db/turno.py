@@ -1,14 +1,25 @@
-from datetime import datetime
-from sqlalchemy import ForeignKey, DateTime, String
-from sqlalchemy.orm import Mapped, mapped_column, relationship
-from db.base import Base  
+from sqlalchemy import Column, Integer, String, Date, Time, Enum, ForeignKey
+from sqlalchemy.orm import relationship
+from db.base import Base
+import enum
+
+class EstadoTurno(enum.Enum):
+    pendiente = "pendiente"
+    confirmado = "confirmado"
+    cancelado = "cancelado"
 
 class Turno(Base):
     __tablename__ = "turnos"
 
-    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(ForeignKey("users.id"), nullable=False)
-    fecha_hora: Mapped[datetime] = mapped_column(DateTime, nullable=False)
-    estado: Mapped[str] = mapped_column(String(20), default="pendiente")
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    fecha = Column(Date, nullable=False)
+    hora = Column(Time, nullable=False)
+    motivo = Column(String(255), nullable=True)
+    estado = Column(Enum(EstadoTurno), default=EstadoTurno.pendiente, nullable=False)
 
-    user = relationship("User", back_populates="turnos")
+    # Relaciones
+    paciente_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    kinesiologo_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+
+    paciente = relationship("User", foreign_keys=[paciente_id], backref="turnos_paciente")
+    kinesiologo = relationship("User", foreign_keys=[kinesiologo_id], backref="turnos_kinesiologo")

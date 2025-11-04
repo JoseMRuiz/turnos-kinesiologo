@@ -2,41 +2,43 @@ from datetime import datetime, timedelta
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
-from fastapi.security import APIKeyHeader
-from core.config import settings
-from db.session import get_db
-from db.user import User
+from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 
-# Configuración de hash
+from core.config import SECRET_KEY, ALGORITHM, ACCESS_TOKEN_EXPIRE_MINUTES
+from db.session import get_db
+from db.user import User
+
+# ==============================
+# 🔐 CONFIGURACIÓN DE SEGURIDAD
+# ==============================
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+oauth2_scheme = HTTPBearer()
 
-# JWT Config
-SECRET_KEY = settings.SECRET_KEY
-ALGORITHM = settings.ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.ACCESS_TOKEN_EXPIRE_MINUTES
 
-# --- HASH de contraseñas ---
+# ==============================
+# 🔹 HASH DE CONTRASEÑA
+# ==============================
 def get_password_hash(password: str) -> str:
-   
     if len(password.encode("utf-8")) > 72:
         raise HTTPException(
             status_code=400,
             detail="La contraseña no puede tener más de 72 caracteres."
         )
+    return pwd_context.hash(password)
 
-    try:
-        return pwd_context.hash(password)
-    except ValueError as e:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Error al generar hash: {str(e)}"
-        )
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
 
-# --- JWT ---
+
+# ==============================
+# 🔹 CREACIÓN DEL TOKEN JWT
+# ==============================
 def create_access_token(data: dict, expires_delta: timedelta | None = None):
+    """
+    Genera un JWT de acceso a partir de un diccionario de datos.
+    """
     to_encode = data.copy()
     expire = datetime.utcnow() + (expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode.update({"exp": expire})
@@ -44,31 +46,38 @@ def create_access_token(data: dict, expires_delta: timedelta | None = None):
     return encoded_jwt
 
 
-
-oauth2_scheme = APIKeyHeader(name="Authorization")
-
-def verify_token(token: str = Depends(oauth2_scheme)):
-
+# ==============================
+# 🔹 VERIFICACIÓN DEL TOKEN
+# ==============================
+def verify_token(credentials=Depends(oauth2_scheme)):
+    token = credentials.credentials
+    print("🪪 TOKEN RECIBIDO:", token[:50], "...")  # ✅ Debug: ver parte del token
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        print("✅ PAYLOAD DECODIFICADO:", payload)
         return payload
-    except JWTError:
+    except JWTError as e:
+        print("❌ ERROR JWT:", str(e))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Token inválido o expirado",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)):
-    try:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
-            raise HTTPException(status_code=401, detail="Token inválido")
-    except JWTError:
-        raise HTTPException(status_code=401, detail="Token inválido o expirado")
 
-    user = db.query(User).filter(User.username == username).first()
+
+# ==============================
+# 🔹 USUARIO ACTUAL
+# ==============================
+def get_current_user(payload: dict = Depends(verify_token), db: Session = Depends(get_db)):
+    """
+    Retorna el usuario autenticado a partir del token.
+    """
+    email = payload.get("sub")
+    if not email:
+        raise HTTPException(status_code=401, detail="Token inválido: falta sub")
+
+    user = db.query(User).filter(User.email == email).first()
     if not user:
-        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+        raise HTTPException(status_code=401, detail="Usuario no encontrado o token inválido.")
     return user

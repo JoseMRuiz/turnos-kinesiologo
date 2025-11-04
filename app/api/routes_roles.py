@@ -5,7 +5,7 @@ from schemas.role import RoleOut, RoleCreate
 from services.roles import get_roles, create_role
 from core.dependencies import require_role
 
-router = APIRouter(prefix="/roles", tags=["roles"])
+router = APIRouter(prefix="/roles", tags=["Roles"])
 
 @router.get("/", response_model=list[RoleOut], dependencies=[Depends(require_role("admin"))])
 def get_roles_route(db: Session = Depends(get_db)):

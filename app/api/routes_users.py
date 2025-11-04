@@ -4,8 +4,12 @@ from db.session import get_db
 from db.user import User
 from core.security import  verify_token
 from core.dependencies import require_role
+from db.role import Role
 
 router = APIRouter()
+
+
+router = APIRouter(prefix="/users", tags=["Usuarios"])
 
 # -------------------------
 # 🔹 Solo el admin puede ver todos los usuarios
@@ -21,11 +25,12 @@ def get_all_users(db: Session = Depends(get_db)):
 # -------------------------
 @router.get("/me")
 def get_my_profile(payload: dict = Depends(verify_token), db: Session = Depends(get_db)):
-    user_id = payload.get("sub")
-    user = db.query(User).filter(User.id == user_id).first()
+    email = payload.get("sub")
+    user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
+
 
 
 # -------------------------
@@ -40,3 +45,28 @@ def delete_user(user_id: int, db: Session = Depends(get_db)):
     db.delete(user)
     db.commit()
     return {"msg": "Usuario eliminado correctamente"}
+
+
+@router.put("/{user_id}/role/{role_id}", dependencies=[Depends(require_role("admin"))])
+def assign_role_to_user(user_id: int, role_id: int, db: Session = Depends(get_db)):
+    user = db.query(User).filter(User.id == user_id).first()
+    role = db.query(Role).filter(Role.id == role_id).first()
+
+    if not user:
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    if not role:
+        raise HTTPException(status_code=404, detail="Rol no encontrado")
+
+    # 🚫 Validar que solo haya un admin
+    if role.name == "admin":
+        existing_admin = db.query(User).join(Role).filter(Role.name == "admin").first()
+        if existing_admin and existing_admin.id != user.id:
+            raise HTTPException(
+                status_code=400,
+                detail="Ya existe un usuario con rol admin. No se puede asignar otro."
+            )
+
+    user.role_id = role.id
+    db.commit()
+    db.refresh(user)
+    return {"msg": f"Rol '{role.name}' asignado correctamente a {user.nombre}"}
