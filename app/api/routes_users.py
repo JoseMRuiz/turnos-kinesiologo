@@ -25,13 +25,28 @@ def get_all_users(db: Session = Depends(get_db)):
 # -------------------------
 @router.get("/me")
 def get_my_profile(payload: dict = Depends(verify_token), db: Session = Depends(get_db)):
-    email = payload.get("sub")
+    """
+    Devuelve la información del usuario autenticado, usando el email del token.
+    """
+    email = payload.get("sub")  
+    if not email:
+        raise HTTPException(status_code=401, detail="Token inválido")
+
     user = db.query(User).filter(User.email == email).first()
     if not user:
         raise HTTPException(status_code=404, detail="Usuario no encontrado")
-    return user
 
-
+    # Devolvemos el nombre del rol completo
+    return {
+        "id": user.id,
+        "nombre": user.nombre,
+        "email": user.email,
+        "role": {
+            "id": user.role.id,
+            "name": user.role.name,
+            "description": user.role.description
+        }
+    }
 
 # -------------------------
 # 🔹 Solo admin puede eliminar usuarios
@@ -70,3 +85,5 @@ def assign_role_to_user(user_id: int, role_id: int, db: Session = Depends(get_db
     db.commit()
     db.refresh(user)
     return {"msg": f"Rol '{role.name}' asignado correctamente a {user.nombre}"}
+
+
