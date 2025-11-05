@@ -1,12 +1,14 @@
 from pydantic import BaseModel
 from datetime import date, time
 from typing import Optional
-from enum import Enum
+from app.turnos_enum import EstadoTurno  # 👈 import correcto
 
-class EstadoTurno(str, Enum):
-    pendiente = "pendiente"
-    confirmado = "confirmado"
-    cancelado = "cancelado"
+class UserShort(BaseModel):
+    id: int
+    nombre: str
+    email: str
+    class Config:
+        from_attributes = True
 
 class TurnoBase(BaseModel):
     fecha: date
@@ -14,7 +16,7 @@ class TurnoBase(BaseModel):
     motivo: Optional[str] = None
 
 class TurnoCreate(TurnoBase):
-    paciente_id: Optional[int] = None  # si lo crea la recepcionista
+    paciente_id: Optional[int] = None
     kinesiologo_id: int
 
 class TurnoUpdateEstado(BaseModel):
@@ -23,8 +25,7 @@ class TurnoUpdateEstado(BaseModel):
 class TurnoOut(TurnoBase):
     id: int
     estado: EstadoTurno
-    paciente_id: int
-    kinesiologo_id: int
-
+    paciente: Optional[UserShort]
+    kinesiologo: Optional[UserShort]
     class Config:
-        orm_mode = True
+        from_attributes = True
